@@ -4,6 +4,7 @@ command = []
 dx, dy = [-1, 0, 1, 0], [0, 1, 0, -1]
 chess = [list(map(int, input().split())) for _ in range(L)]
 occupy = [[0 for _ in range(L + 1)] for _ in range(L + 1)]
+temp_damage = [0 for _ in range(N + 1)]
 for i in range(L):
     chess[i].insert(0, 0)
 chess.insert(0, [0 for _ in range(L + 1)])
@@ -25,43 +26,39 @@ def damage(idx):
         for i in range(x_s, x_e):
             if chess[i][j] == 1:
                 count += 1
-    return count
+    temp_damage[idx] = count
 
 
-def pull(idx, direc):
+def pull(now, idx, direc):
     if knight[idx][0] == -1:
         return
-    nx, ny = knight[idx][0] + dx[direc], knight[idx][1] + dy[direc]
-    knight[idx][0], knight[idx][1] = nx, ny
-    dam = damage(idx)
-    knight[idx][4] -= dam
-    knight[idx][5] += dam
-    if knight[idx][4] <= 0:
-        knight[idx][0] = -1  # 죽음
+    knight[idx][0], knight[idx][1] = knight[idx][0] + dx[direc], knight[idx][1] + dy[direc]
+    if now == idx:
+        return
+    damage(idx)
 
 
-def movable(idx, direc):
-    nx, ny = knight[idx][0] + dx[direc], knight[idx][1] + dy[direc]
-    x_s, x_e, y_s, y_e = nx, nx + knight[idx][2], ny, ny + knight[idx][3]
+def movable(now, i, direc, visited):
+    nx, ny = knight[i][0] + dx[direc], knight[i][1] + dy[direc]
+    x_s, x_e, y_s, y_e = nx, nx + knight[i][2], ny, ny + knight[i][3]
     for y in range(y_s, y_e):
         for x in range(x_s, x_e):
-            if (occupy[x][y] != idx and occupy[x][y] != 0) or (
-                    chess[x][y] == 2 or not (0 < x <= L and 0 < y <= L)):  # 기사나 벽
-                if chess[x][y] == 2 or not (0 < x <= L and 0 < y <= L):
+            if (not (0 < x <= L and 0 < y <= L) or chess[x][y] == 2) or \
+                    (occupy[x][y] != i and occupy[x][y] != 0):  # 벽이나 기사
+                if not (0 < x <= L and 0 < y <= L) or chess[x][y] == 2:
                     return False
-                i = occupy[x][y]
-                nx_x, nx_e, ny_s, ny_e = x_s, x_e, y_s, y_e = knight[i][0], knight[i][0] + knight[i][2], knight[i][1], \
-                                                              knight[i][1] + knight[i][3]
-                if occupy[x][y] != idx and occupy[x][y] != 0:
-                    if movable(i, direc):
-                        pull(i, direc)
+                n_i = occupy[x][y]
+                if not visited[n_i]:
+                    visited[n_i] = True
+                    if movable(now, n_i, direc, visited):
+                        pull_list.append([now, n_i, direc])
                     else:
                         return False
-    else:
-        return True
+    return True
 
 
 def occupy_map():
+    occupy = [[0 for _ in range(L + 1)] for _ in range(L + 1)]
     for i in range(1, N + 1):
         if knight[i][0] == -1:
             continue
@@ -69,19 +66,30 @@ def occupy_map():
         for y in range(y_s, y_e):
             for x in range(x_s, x_e):
                 occupy[x][y] = i
+    return occupy
 
 
 for i, d in command:
-    occupy_map()
+    temp_damage = [0 for _ in range(N + 1)]
+    visited = [False for _ in range(N + 1)]
+    pull_list = []
     if knight[i][0] == -1:
         continue
-    if not movable(i, d):
+    occupy = occupy_map()
+    if not movable(i, i, d, visited):
         continue
     else:
         knight[i][0], knight[i][1] = knight[i][0] + dx[d], knight[i][1] + dy[d]
-        pull(i, d)
+        for i in pull_list:
+            pull(i[0], i[1], i[2])
+        for i in range(1, N + 1):
+            knight[i][4] -= temp_damage[i]
+            knight[i][5] += temp_damage[i]
+            if knight[i][4] <= 0:
+                knight[i][0] = -1
+
 ans = 0
 for k in knight:
     if k[0] != -1:
-        ans += k[4]
+        ans += k[5]
 print(ans)
